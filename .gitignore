@@ -12,3 +12,12 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Build and local configuration
+.env
+frontend/node_modules/
+frontend/dist/
+backend/target/
+
+# Local database and running services
+.local/

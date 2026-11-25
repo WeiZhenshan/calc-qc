@@ -1,78 +1,13 @@
-/* ============================================
-   brands.js — 品牌数据 & 匹配引擎
-   ============================================ */
-
-// ---- 别名表 ----
-const BRAND_ALIASES = {
-    // 中华
-    '中华硬': '中华(硬)', '硬中华': '中华(硬)',
-    '中华软': '中华(软)', '软中华': '中华(软)',
-    '中华双中支': '中华(双中支)', '双中支': '中华(双中支)',
-    '中华金中支': '中华(金中支)', '金中支': '中华(金中支)',
-    '中华细支': '中华(细支)',
-    // 利群
-    '利群新版': '利群(新版)',
-    '利群软红': '利群(软红长嘴)', '利群软红长嘴': '利群(软红长嘴)',
-    '利群阳光': '利群(软阳光)', '利群软阳光': '利群(软阳光)',
-    '利群西子阳光': '利群(西子阳光)', '西子阳光': '利群(西子阳光)',
-    '利群夜西湖': '利群(夜西湖)', '夜西湖': '利群(夜西湖)',
-    // 黄鹤楼
-    '黄鹤楼软蓝': '黄鹤楼(软蓝)', '黄鹤楼蓝': '黄鹤楼(软蓝)', '黄鹤楼蓝软': '黄鹤楼(软蓝)',
-    '黄鹤楼硬珍': '黄鹤楼(硬珍品)', '黄鹤楼珍品': '黄鹤楼(硬珍品)',
-    '黄鹤楼软珍': '黄鹤楼(软珍品)', '黄鹤楼软珍品': '黄鹤楼(软珍品)',
-    '黄鹤楼硬红': '黄鹤楼(硬红)',
-    '黄鹤楼天下名楼': '黄鹤楼(天下名楼)', '天下名楼': '黄鹤楼(天下名楼)',
-    // 芙蓉王
-    '芙蓉王硬': '芙蓉王(硬)', '硬芙蓉王': '芙蓉王(硬)',
-    '芙蓉王软蓝': '芙蓉王(软蓝)',
-    '芙蓉王硬蓝': '芙蓉王(硬蓝)',
-    // 玉溪
-    '玉溪软': '玉溪(软)', '软玉溪': '玉溪(软)',
-    '玉溪硬': '玉溪(硬)', '硬玉溪': '玉溪(硬)',
-    '玉溪软尚善': '玉溪(软尚善)', '玉溪尚善': '玉溪(软尚善)', '软尚善': '玉溪(软尚善)',
-    // 云烟
-    '云烟软珍': '云烟(软珍品)', '云烟珍品': '云烟(软珍品)', '云烟软珍品': '云烟(软珍品)',
-    '云烟紫': '云烟(紫)', '紫云': '云烟(紫)', '紫云烟': '云烟(紫)',
-    '云烟细支珍品': '云烟(细支珍品)', '云烟细珍': '云烟(细支珍品)',
-    '小熊猫': '云烟(小熊猫)', '云烟小熊猫': '云烟(小熊猫)',
-    // 南京
-    '南京炫赫门': '南京(炫赫门)', '炫赫门': '南京(炫赫门)',
-    '南京红': '南京(红)', '红南京': '南京(红)',
-    '南京雨花石': '南京(雨花石)', '雨花石': '南京(雨花石)',
-    '南京九五': '南京(九五)', '九五至尊': '南京(九五)', '九五': '南京(九五)',
-    // 苏烟
-    '红杉树': '苏烟(五星红杉树)', '五星红杉树': '苏烟(五星红杉树)', '苏烟五星': '苏烟(五星红杉树)',
-    '苏烟软金砂': '苏烟(软金砂)', '软金砂': '苏烟(软金砂)', '苏烟金砂': '苏烟(软金砂)',
-    // 红塔山
-    '红塔山1956': '红塔山(经典1956)', '红塔山经典': '红塔山(经典1956)', '红塔山经典1956': '红塔山(经典1956)',
-    '红塔山大经典': '红塔山(大经典)', '大经典': '红塔山(大经典)',
-    // 黄金叶
-    '黄金叶乐途': '黄金叶(乐途)', '乐途': '黄金叶(乐途)',
-    '黄金叶金满堂': '黄金叶(金满堂)', '金满堂': '黄金叶(金满堂)',
-    '黄金叶天叶': '黄金叶(天叶)', '天叶': '黄金叶(天叶)',
-    // 双喜
-    '双喜软经典': '双喜(软经典)',
-    '双喜硬经典': '双喜(硬经典)', '双喜经典': '双喜(硬经典)',
-    // 黄山
-    '黄山记忆': '黄山(记忆)',
-    '黄山大红方印': '黄山(大红方印)', '大红方印': '黄山(大红方印)',
-    // 白沙
-    '和天下': '白沙(和天下)', '白沙和天下': '白沙(和天下)',
-    '白沙精品': '白沙(精品)',
-    // 其他
-    '钻石荷花': '钻石(荷花)', '荷花': '钻石(荷花)',
-    '贵烟跨越': '贵烟(跨越)', '跨越': '贵烟(跨越)',
-};
+import brandAliases from '../../docs/data/brand-aliases.json' with { type: 'json' };
 
 // ---- 品牌索引 ----
-let brandNameToIndex = {};
-
-function buildBrandIndex(brands) {
-    brandNameToIndex = {};
-    brands.forEach((b, i) => {
-        brandNameToIndex[normalizeText(b.name)] = i;
-    });
+export function buildBrandIndex(brands) {
+    return new Map(brands.map((brand, index) => [normalizeText(brand.name), index]));
 }
+
+const aliases = Object.entries(brandAliases).map(([alias, target]) => [
+    normalizeText(alias), normalizeText(target),
+]);
 
 // ---- 文本标准化 ----
 function normalizeText(text) {
@@ -101,22 +36,22 @@ function extractKeywords(name) {
 }
 
 // ---- 品牌匹配（多策略） ----
-function matchBrand(text, brands) {
+export function matchBrand(text, brands, index = buildBrandIndex(brands)) {
     if (!text || !brands.length) return null;
     const t = normalizeText(text);
     if (!t) return null;
     const tNoBr = stripBrackets(t);
 
     // 1. 查别名表
-    for (const [alias, target] of Object.entries(BRAND_ALIASES)) {
-        if (normalizeText(alias) === t || normalizeText(alias) === tNoBr) {
-            const idx = brandNameToIndex[normalizeText(target)];
+    for (const [alias, target] of aliases) {
+        if (alias === t || alias === tNoBr) {
+            const idx = index.get(target);
             if (idx !== undefined) return idx;
         }
     }
 
     // 2. 精确匹配
-    if (brandNameToIndex[t] !== undefined) return brandNameToIndex[t];
+    if (index.has(t)) return index.get(t);
 
     // 3. 去括号匹配
     for (let i = 0; i < brands.length; i++) {
@@ -160,8 +95,51 @@ function matchBrand(text, brands) {
     return bestScore >= 0.5 ? best : null;
 }
 
+// File imports update prices only when a name or known alias identifies one catalog entry.
+export function matchMarketPriceRows(rows, brands) {
+    const byName = new Map();
+    brands.forEach((brand, index) => {
+        const key = normalizeText(brand.name);
+        byName.set(key, byName.has(key) ? null : index);
+    });
+    const byAlias = new Map(aliases);
+    const prices = new Map();
+    const issues = [];
+    let first = true;
+    for (const [offset, row] of rows.entries()) {
+        if (!row || row.every(cell => cell == null || cell === '')) continue;
+        const [rawName, rawPrice, ...extra] = row;
+        const name = typeof rawName === 'string' || typeof rawName === 'number' ? String(rawName).trim() : '';
+        if (first && ['品牌', '品牌名', '品牌名称', '市场价'].includes(name) && !Number.isFinite(Number(rawPrice))) {
+            if (name === '市场价' || rawPrice !== '市场价' || extra.some(cell => cell != null && cell !== '')) {
+                throw new Error('请按「品牌名、市场价」两列填写 Excel。');
+            }
+            first = false;
+            continue;
+        }
+        first = false;
+        const line = `第 ${offset + 1} 行`;
+        const market = typeof rawPrice === 'string' && /^\d+(?:\.\d+)?$/.test(rawPrice.trim())
+            ? Number(rawPrice) : rawPrice;
+        if (!name || !validCatalogPrice(market) || extra.some(cell => cell != null && cell !== '')) {
+            issues.push(`${line}：请填写品牌名和有效市场价两列`);
+            continue;
+        }
+        const key = normalizeText(name);
+        const index = byName.has(key) ? byName.get(key) : byName.get(byAlias.get(key));
+        if (index == null) {
+            issues.push(`${line}「${name}」：${index === null ? '品牌重名，无法确定' : '未匹配到品牌'}`);
+            continue;
+        }
+        if (prices.has(index)) issues.push(`${line}「${name}」重复，采用本行价格`);
+        prices.set(index, market);
+    }
+    if (!prices.size && !issues.length) throw new Error('第一张工作表中没有价格数据。');
+    return { prices, issues };
+}
+
 // ---- 行解析 ----
-function parseLine(line) {
+export function parseLine(line) {
     let cleaned = line.replace(/[¥￥元]/g, '').replace(/条/g, '').trim();
     if (!cleaned) return null;
 
@@ -197,15 +175,15 @@ function parseLine(line) {
 }
 
 // ---- 导出品牌库为文本 ----
-function brandsToText(brands) {
+export function brandsToText(brands) {
     return brands.map(b => {
-        const mkt = b.market !== undefined ? ` ${b.market}` : '';
+        const mkt = b.market != null ? ` ${b.market}` : '';
         return `${b.name} ${b.wholesale}${mkt}`;
     }).join('\n');
 }
 
 // ---- 解析文本为品牌库 ----
-function textToBrands(text) {
+export function textToBrands(text) {
     const lines = text.split(/[\n\r]+/).filter(l => l.trim());
     const brands = [];
     const errors = [];
@@ -233,17 +211,46 @@ function textToBrands(text) {
             name = parts.slice(0, -1).join(' ');
         }
 
-        if (!name || isNaN(wholesale) || wholesale <= 0) {
+        if (!name || name.length > 120 || !validCatalogPrice(wholesale)) {
             errors.push(`第${i + 1}行无法解析`);
             return;
         }
 
         const brand = { name, wholesale };
-        if (market !== undefined && !isNaN(market) && market > 0) {
-            brand.market = market;
+        if (market > 0 && !validCatalogPrice(market)) {
+            errors.push(`第${i + 1}行市场价超出范围`);
+            return;
         }
+        if (market > 0) brand.market = market;
         brands.push(brand);
     });
 
     return { brands, errors };
+}
+
+export function validCatalogPrice(value) {
+    return Number.isFinite(value) && value > 0 && value < 1e9
+        && Number(value.toFixed(6)) === value;
+}
+
+export function newBrandId() {
+    if (globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
+    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    const id = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    return [id.slice(0, 8), id.slice(8, 12), id.slice(12, 16), id.slice(16, 20), id.slice(20)].join('-');
+}
+
+// Match occurrences by name so reordering retains each brand's stable ID and tags.
+export function retainBrandIdentity(parsed, current) {
+    const byName = new Map();
+    current.forEach(brand => {
+        if (!byName.has(brand.name)) byName.set(brand.name, []);
+        byName.get(brand.name).push(brand);
+    });
+    return parsed.map(brand => {
+        const old = byName.get(brand.name)?.shift();
+        return { ...brand, market: brand.market ?? null, id: old?.id ?? newBrandId(), tags: old?.tags ?? [] };
+    });
 }

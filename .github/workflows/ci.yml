@@ -1,0 +1,59 @@
+name: Build and verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: calc_qc
+          MYSQL_USER: calc_qc
+          MYSQL_PASSWORD: ci-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h127.0.0.1 --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+      - run: npm ci --prefix frontend
+      - run: npm test --prefix frontend
+      - run: npm run build --prefix frontend
+      - run: mvn -B -f backend/pom.xml package
+      - name: Verify the packaged app against MySQL
+        env:
+          DB_PASSWORD: ci-only
+        run: |
+          java -jar backend/target/calc-qc-1.0.0.jar > /tmp/calc-qc.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/api/auth/csrf > /dev/null; then break; fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then cat /tmp/calc-qc.log; exit 1; fi
+            sleep 1
+          done
+          node scripts/smoke-test.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: calc-qc
+          path: backend/target/calc-qc-1.0.0.jar

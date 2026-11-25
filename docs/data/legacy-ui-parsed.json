@@ -1,0 +1,55 @@
+{
+  "brandEditor": {
+    "instructionalLine": "品牌名 批发价 市场价",
+    "brands": [
+      {
+        "name": "中华(硬)",
+        "wholesale": 381,
+        "market": 450
+      },
+      {
+        "name": "利群(新版)",
+        "wholesale": 122,
+        "market": 155
+      }
+    ],
+    "errors": []
+  },
+  "priceImport": {
+    "rows": [
+      {
+        "text": "中华（硬） 381.0 400.0",
+        "brandText": "中华（硬）",
+        "wholesale": 381,
+        "market": 400,
+        "defaultBrandPosition": 0,
+        "matchedBrand": "中华(硬)",
+        "quantity": 1
+      },
+      {
+        "text": "利群(新版) 122.0 155.0",
+        "brandText": "利群(新版)",
+        "wholesale": 122,
+        "market": 155,
+        "defaultBrandPosition": 5,
+        "matchedBrand": "利群(新版)",
+        "quantity": 1
+      },
+      {
+        "text": "软中华 583.5 700.0",
+        "brandText": "软中华",
+        "wholesale": 583.5,
+        "market": 700,
+        "defaultBrandPosition": 1,
+        "matchedBrand": "中华(软)",
+        "quantity": 1
+      }
+    ],
+    "totals": {
+      "cost": 1086.5,
+      "revenue": 1255,
+      "profit": 168.5,
+      "count": 3
+    }
+  }
+}
