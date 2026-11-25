@@ -21,7 +21,7 @@ function offlineShell() {
                 .filter(entry => entry.isFile() && entry.name !== 'sw.js')
                 .map(entry => join(entry.parentPath ?? entry.path, entry.name))
                 .sort();
-            const manifest = files.map(file => '/' + relative(folder, file).replaceAll('\\', '/'));
+            const manifest = files.map(file => config.base + relative(folder, file).replaceAll('\\', '/'));
             const hash = createHash('sha256');
             for (const file of files) hash.update(await readFile(file));
             const source = await readFile(new URL('src/service-worker.js', root), 'utf8');

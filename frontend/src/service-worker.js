@@ -1,4 +1,6 @@
-const prefix = 'calc-qc-shell-';
+const scopePath = new URL(self.registration.scope).pathname;
+const indexPath = scopePath + 'index.html';
+const prefix = scopePath === '/' ? 'calc-qc-shell-' : 'calc-qc-shell:' + scopePath + ':';
 const cacheName = prefix + '__CACHE_VERSION__';
 const precache = __PRECACHE_FILES__;
 
@@ -17,10 +19,10 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
-    if (event.request.mode === 'navigate' && ['/', '/index.html'].includes(url.pathname)) {
+    if (event.request.mode === 'navigate' && [scopePath, indexPath].includes(url.pathname)) {
         event.respondWith(fetch(event.request).catch(async () => {
             const cache = await caches.open(cacheName);
-            return cache.match('/index.html');
+            return cache.match(indexPath);
         }));
         return;
     }

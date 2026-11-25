@@ -57,6 +57,14 @@ java -jar backend/target/calc-qc-1.0.0.jar
 
 配置独立测试库的 `DB_URL`、`DB_USER`、`DB_PASSWORD`，安装 MySQL 命令行客户端后运行接口验收，在应用启动后执行 `node scripts/smoke-test.mjs`。脚本会创建两个随机测试账号，并为其中一个依次分配三种角色以验证权限，可通过 `TEST_BASE_URL` 指定地址。GitHub Actions 构建并上传 JAR，同时用临时 MySQL 执行该脚本。
 
+## GitHub Pages 发布
+
+`main` 上的前端、预置数据或 Pages 工作流更新后，GitHub Actions 会构建并发布前端。也可以在 Actions 中手动运行「Publish frontend to GitHub Pages」。
+
+要启用登录和数据同步，请在仓库的 Actions 变量中设置 `VITE_API_BASE_URL` 为公网可访问的 HTTPS API 完整前缀（例如 `https://api.example.com/api`），再运行发布工作流。缺少该地址时，登录页会显示后端尚未接入的提示。
+
+独立部署的 API 需要允许 Pages 的精确来源携带凭据访问，支持 CSRF 请求头和 `X-Workspace-User` 的预检请求。会话 Cookie 需设为 `Secure`，跨站时还需 `SameSite=None` 并受浏览器第三方 Cookie 策略约束。如使用自有域名，可将 Pages 和 API 分别配置在同一主域的子域下。
+
 ## 文档
 
 - [架构与请求链路](docs/architecture/README.md)

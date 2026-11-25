@@ -5,7 +5,13 @@ export class ApiError extends Error {
     }
 }
 
+const pagesBuild = import.meta.env.MODE === 'pages';
+const apiBase = (import.meta.env.VITE_API_BASE_URL || (pagesBuild ? '' : '/api')).replace(/\/+$/, '');
+
 async function request(path, { method = 'GET', data, user } = {}) {
+    if (pagesBuild && !/^https:\/\//i.test(apiBase)) {
+        throw new ApiError(503, '本站尚未接入 HTTPS 后端，暂时无法登录或注册。');
+    }
     const headers = { Accept: 'application/json' };
     if (user !== undefined) headers['X-Workspace-User'] = String(user);
     if (method !== 'GET') {
@@ -23,7 +29,7 @@ async function request(path, { method = 'GET', data, user } = {}) {
 
     let response;
     try {
-        response = await fetch('/api' + path, { method, headers, body, cache: 'no-store', credentials: 'same-origin' });
+        response = await fetch(apiBase + path, { method, headers, body, cache: 'no-store', credentials: 'include' });
     } catch {
         throw new ApiError(0, '服务器不可达');
     }

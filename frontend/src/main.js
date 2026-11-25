@@ -12,6 +12,6 @@ createApp(App).use(Button).use(Icon).use(Pagination).use(Search).use(Tabbar).use
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(error => console.warn('离线缓存注册失败', error));
+        navigator.serviceWorker.register(import.meta.env.BASE_URL + 'sw.js').catch(error => console.warn('离线缓存注册失败', error));
     });
 }
