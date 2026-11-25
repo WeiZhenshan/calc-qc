@@ -1,18 +1,11 @@
 package io.calcqc;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.UUID;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,19 +29,12 @@ class Accounts implements UserDetailsService {
     record Account(long id, String username, String passwordHash, AccountRole role) {
     }
 
-    private record SeedBrand(String name, BigDecimal wholesale, BigDecimal market) {
-    }
-
     private final JdbcTemplate jdbc;
     private final PasswordEncoder passwords;
-    private final List<SeedBrand> seedBrands;
 
-    Accounts(JdbcTemplate jdbc, PasswordEncoder passwords, ObjectMapper mapper) throws IOException {
+    Accounts(JdbcTemplate jdbc, PasswordEncoder passwords) {
         this.jdbc = jdbc;
         this.passwords = passwords;
-        try (var input = new ClassPathResource("seed/default-brands.json").getInputStream()) {
-            this.seedBrands = mapper.readValue(input, new TypeReference<>() {});
-        }
     }
 
     @Transactional
@@ -63,15 +49,6 @@ class Accounts implements UserDetailsService {
         } catch (DuplicateKeyException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "用户名已存在");
         }
-        long id = require(username).id();
-        var rows = new java.util.ArrayList<Object[]>(seedBrands.size());
-        for (int i = 0; i < seedBrands.size(); i++) {
-            var seed = seedBrands.get(i);
-            rows.add(new Object[] {id, UUID.randomUUID().toString(), seed.name(), seed.wholesale(), seed.market(), i});
-        }
-        jdbc.batchUpdate("""
-                INSERT INTO brand (user_id, id, name, wholesale, market, sort_order) VALUES (?, ?, ?, ?, ?, ?)
-                """, rows);
     }
 
     Account require(String username) {

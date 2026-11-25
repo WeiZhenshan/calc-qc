@@ -25,8 +25,8 @@ class Workspace {
 
     @Transactional(readOnly = true)
     public WorkspaceState load(long userId) {
-        long revision = jdbc.queryForObject("SELECT catalog_revision FROM app_user WHERE id = ?", Long.class, userId);
-        return new WorkspaceState(loadCatalog(userId, revision), loadSnapshot(userId));
+        long revision = jdbc.queryForObject("SELECT revision FROM shared_catalog WHERE id = 1", Long.class);
+        return new WorkspaceState(loadCatalog(revision), loadSnapshot(userId));
     }
 
     @Transactional
@@ -35,7 +35,7 @@ class Workspace {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前角色无权修改品牌库");
         }
         long revision = jdbc.queryForObject(
-                "SELECT catalog_revision FROM app_user WHERE id = ?", Long.class, userId);
+                "SELECT revision FROM shared_catalog WHERE id = 1 FOR UPDATE", Long.class);
         if (catalog.revision() != revision) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "品牌库已在其他页面修改，请重新加载后再保存");
         }
@@ -50,35 +50,35 @@ class Workspace {
             var brand = catalog.brands().get(i);
             String id = brand.id().toString();
             if (!brandIds.add(id)) badRequest("品牌 ID 重复");
-            brandRows.add(new Object[] {userId, id, brand.name(), brand.wholesale(), brand.market(), i});
+            brandRows.add(new Object[] {id, brand.name(), brand.wholesale(), brand.market(), i});
 
             var assigned = new HashSet<String>();
             for (int j = 0; j < brand.tags().size(); j++) {
                 String tag = brand.tags().get(j);
                 if (!allowedTags.contains(tag) || !assigned.add(tag)) badRequest("品牌的标签分配无效");
-                assignmentRows.add(new Object[] {userId, id, tag, j});
+                assignmentRows.add(new Object[] {id, tag, j});
             }
         }
 
-        jdbc.batchUpdate("DELETE FROM brand WHERE user_id = ? AND id = ?", brandIds(userId).stream()
-                .filter(id -> !brandIds.contains(id)).map(id -> new Object[] {userId, id}).toList());
+        jdbc.batchUpdate("DELETE FROM shared_brand WHERE id = ?", brandIds().stream()
+                .filter(id -> !brandIds.contains(id)).map(id -> new Object[] {id}).toList());
         jdbc.batchUpdate("""
-                INSERT INTO brand (user_id, id, name, wholesale, market, sort_order)
-                VALUES (?, ?, ?, ?, ?, ?) AS incoming
+                INSERT INTO shared_brand (id, name, wholesale, market, sort_order)
+                VALUES (?, ?, ?, ?, ?) AS incoming
                 ON DUPLICATE KEY UPDATE name = incoming.name, wholesale = incoming.wholesale,
                     market = incoming.market, sort_order = incoming.sort_order
                 """, brandRows);
-        jdbc.update("DELETE FROM tag WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM shared_tag");
 
         var tagRows = new ArrayList<Object[]>();
         for (int i = 0; i < catalog.tags().size(); i++) {
-            tagRows.add(new Object[] {userId, catalog.tags().get(i), i});
+            tagRows.add(new Object[] {catalog.tags().get(i), i});
         }
-        jdbc.batchUpdate("INSERT INTO tag (user_id, name, sort_order) VALUES (?, ?, ?)", tagRows);
+        jdbc.batchUpdate("INSERT INTO shared_tag (name, sort_order) VALUES (?, ?)", tagRows);
         jdbc.batchUpdate("""
-                INSERT INTO brand_tag (user_id, brand_id, tag_name, sort_order) VALUES (?, ?, ?, ?)
+                INSERT INTO shared_brand_tag (brand_id, tag_name, sort_order) VALUES (?, ?, ?)
                 """, assignmentRows);
-        jdbc.update("UPDATE app_user SET catalog_revision = catalog_revision + 1 WHERE id = ?", userId);
+        jdbc.update("UPDATE shared_catalog SET revision = revision + 1 WHERE id = 1");
 
         return new Catalog(revision + 1, catalog.tags(), catalog.brands());
     }
@@ -86,14 +86,15 @@ class Workspace {
     @Transactional
     public Snapshot saveSnapshot(long userId, Snapshot snapshot) {
         var role = lockRole(userId);
+        jdbc.queryForObject("SELECT revision FROM shared_catalog WHERE id = 1 FOR SHARE", Long.class);
         if (!role.canRemoveRows() && snapshot.items().stream().anyMatch(SnapshotItem::hidden)) {
             var alreadyHidden = new HashSet<>(jdbc.queryForList(
-                    "SELECT brand_id FROM calc_snapshot_item WHERE user_id = ? AND is_hidden = TRUE", String.class, userId));
+                    "SELECT brand_id FROM user_calculation_item WHERE user_id = ? AND is_hidden = TRUE", String.class, userId));
             if (snapshot.items().stream().anyMatch(item -> item.hidden() && !alreadyHidden.contains(item.brandId().toString()))) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只有管理员可以移除计算器行");
             }
         }
-        var brandIds = new HashSet<>(brandIds(userId));
+        var brandIds = new HashSet<>(brandIds());
         var seen = new HashSet<UUID>();
         var rows = new ArrayList<Object[]>();
         for (SnapshotItem item : snapshot.items()) {
@@ -110,9 +111,9 @@ class Workspace {
                 INSERT INTO calc_snapshot (user_id, saved_at) VALUES (?, ?) AS incoming
                 ON DUPLICATE KEY UPDATE saved_at = incoming.saved_at
                 """, userId, Timestamp.from(savedAt));
-        jdbc.update("DELETE FROM calc_snapshot_item WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM user_calculation_item WHERE user_id = ?", userId);
         jdbc.batchUpdate("""
-                INSERT INTO calc_snapshot_item (user_id, brand_id, wholesale_override, market_override, quantity,
+                INSERT INTO user_calculation_item (user_id, brand_id, wholesale_override, market_override, quantity,
                     is_hidden) VALUES (?, ?, ?, ?, ?, ?)
                 """, rows);
         return new Snapshot(savedAt, snapshot.items());
@@ -134,20 +135,20 @@ class Workspace {
         return new WorkspaceState(catalog, saveSnapshot(userId, state.snapshot()));
     }
 
-    private Catalog loadCatalog(long userId, long revision) {
-        var tags = jdbc.queryForList("SELECT name FROM tag WHERE user_id = ? ORDER BY sort_order", String.class, userId);
+    private Catalog loadCatalog(long revision) {
+        var tags = jdbc.queryForList("SELECT name FROM shared_tag ORDER BY sort_order", String.class);
         var tagsByBrand = new HashMap<String, List<String>>();
         jdbc.query("""
-                SELECT brand_id, tag_name FROM brand_tag WHERE user_id = ? ORDER BY brand_id, sort_order
+                SELECT brand_id, tag_name FROM shared_brand_tag ORDER BY brand_id, sort_order
                 """, rs -> {
             tagsByBrand.computeIfAbsent(rs.getString("brand_id"), id -> new ArrayList<>())
                     .add(rs.getString("tag_name"));
-        }, userId);
-        var brands = jdbc.query("SELECT * FROM brand WHERE user_id = ? ORDER BY sort_order", (rs, i) -> {
+        });
+        var brands = jdbc.query("SELECT * FROM shared_brand ORDER BY sort_order", (rs, i) -> {
             String id = rs.getString("id");
             return new Brand(UUID.fromString(id), rs.getString("name"), rs.getBigDecimal("wholesale"),
                     rs.getBigDecimal("market"), tagsByBrand.getOrDefault(id, List.of()));
-        }, userId);
+        });
         return new Catalog(revision, tags, brands);
     }
 
@@ -157,7 +158,7 @@ class Workspace {
         if (timestamps.isEmpty()) return null;
 
         var items = jdbc.query("""
-                SELECT i.* FROM calc_snapshot_item i JOIN brand b ON b.user_id = i.user_id AND b.id = i.brand_id
+                SELECT i.* FROM user_calculation_item i JOIN shared_brand b ON b.id = i.brand_id
                 WHERE i.user_id = ? ORDER BY b.sort_order
                 """, (rs, i) -> new SnapshotItem(UUID.fromString(rs.getString("brand_id")),
                 rs.getString("wholesale_override"), rs.getString("market_override"),
@@ -165,8 +166,8 @@ class Workspace {
         return new Snapshot(timestamps.get(0), items);
     }
 
-    private List<String> brandIds(long userId) {
-        return jdbc.queryForList("SELECT id FROM brand WHERE user_id = ?", String.class, userId);
+    private List<String> brandIds() {
+        return jdbc.queryForList("SELECT id FROM shared_brand", String.class);
     }
 
     private AccountRole lockRole(long userId) {

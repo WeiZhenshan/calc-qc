@@ -17,6 +17,32 @@ function readCache() {
     }
 }
 
+// Older caches used per-account brand UUIDs. Leave unmatched IDs in the pending
+// snapshot so a sync conflict is visible instead of silently discarding input.
+function rebasePendingSnapshot(previous, catalog) {
+    const snapshot = previous.snapshot;
+    if (!snapshot) return null;
+    const ids = new Set(catalog.brands.map(brand => brand.id));
+    const byName = new Map();
+    for (const { id, name } of catalog.brands) {
+        byName.set(name, byName.has(name) ? null : id);
+    }
+    const oldNames = new Map(previous.catalog.brands.map(brand => [brand.id, brand.name]));
+    const targets = snapshot.items.map(({ brandId }) =>
+        ids.has(brandId) ? brandId : byName.get(oldNames.get(brandId)));
+    const used = new Set();
+    const ambiguous = new Set();
+    for (const id of targets) {
+        if (used.has(id)) ambiguous.add(id);
+        used.add(id);
+    }
+    const items = snapshot.items.map((item, index) => {
+        const id = targets[index];
+        return id && !ambiguous.has(id) ? { ...item, brandId: id } : item;
+    });
+    return { ...snapshot, items };
+}
+
 function writeCache(value, required = false) {
     try {
         if (value) localStorage.setItem(cacheKey, JSON.stringify(value));
@@ -74,15 +100,18 @@ export function useWorkspace() {
 
     async function loadAccount(account) {
         const cached = readCache();
-        if (cached?.user.id === account.id && hasPending(cached.pending)) {
-            remember(account, cached.state, cached.pending);
-            install(account, cached.state, cached.pending);
-            offline.value = false;
-            return;
+        const queue = cached?.user.id === account.id ? cached.pending : noPending();
+        let workspace;
+        if (queue.catalog || queue.backup) {
+            workspace = cached.state;
+        } else {
+            workspace = await api.load(account.id);
+            if (queue.snapshot) {
+                workspace.snapshot = rebasePendingSnapshot(cached.state, workspace.catalog);
+            }
         }
-        const workspace = await api.load(account.id);
-        remember(account, workspace, noPending());
-        install(account, workspace);
+        remember(account, workspace, queue);
+        install(account, workspace, queue);
         offline.value = false;
     }
 

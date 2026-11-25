@@ -2,6 +2,8 @@
 
 业务表使用 InnoDB。字符数据默认使用 `utf8mb4_0900_bin`，品牌 ID 和用户名使用 ASCII。由 [V1 Flyway 迁移](../../backend/src/main/resources/db/migration/V1__workspace.sql) 建表，[V2 迁移](../../backend/src/main/resources/db/migration/V2__account_roles.sql) 为账号增加角色。Flyway 另有自己的 `flyway_schema_history` 表。
 
+V3、V4 建立共享目录。线上读写使用 `shared_catalog`（统一版本）、`shared_brand`、`shared_tag` 和 `shared_brand_tag`。每个账号的计算明细写入 `user_calculation_item`，由账号快照和共享品牌外键约束。迁移优先采用已维护的管理员目录，按 UUID 或唯一同名品规关联旧快照。下文的 V1、V2 表和 SQL 示例记录历史结构。
+
 ## SQL 脚本
 
 | 文件 | 用途 |

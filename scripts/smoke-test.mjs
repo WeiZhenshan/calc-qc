@@ -68,9 +68,9 @@ const alice = await registerAndLogIn(a, 'a-' + nonce);
 const bob = await registerAndLogIn(b, 'b-' + nonce);
 const initial = (await (await expect(await a('/api/workspace', { user: alice.id }), 200)).json()).catalog;
 const other = (await (await expect(await b('/api/workspace', { user: bob.id }), 200)).json()).catalog;
-assert.equal(initial.brands.length, 44);
-assert.equal(other.brands.length, 44);
-assert.notEqual(initial.brands[0].id, other.brands[0].id);
+assert.equal(initial.brands.length, 355);
+assert.equal(initial.tags.length, 30);
+assert.deepEqual(other, initial);
 await expect(await b('/api/workspace', { user: alice.id }), 403);
 
 // Provision only this run's freshly registered fixture, using the isolated test database.
@@ -97,14 +97,18 @@ await expect(await a('/api/workspace/backup', { ...merchantWrite, body: { catalo
 
 const tag = '测试';
 const brand = { id: randomUUID(), name: '验收品牌', wholesale: 100.56, market: 145.12, tags: [tag] };
-const catalog = { ...initial, tags: [tag], brands: [brand, ...initial.brands.slice().reverse()] };
+const catalog = { ...initial, tags: [...initial.tags, tag], brands: [brand, ...initial.brands.slice().reverse()] };
 const updated = await (await expect(await a('/api/workspace/catalog', { user: alice.id, method: 'PUT', body: catalog }), 200)).json();
 assert.equal(updated.revision, initial.revision + 1);
 await expect(await a('/api/workspace/catalog', { user: alice.id, method: 'PUT', body: catalog }), 409);
 
 const item = { brandId: brand.id, wholesale: '100', market: '151', quantity: '3', hidden: false };
 const snapshot = { items: [item] };
-await expect(await b('/api/workspace/snapshot', { user: bob.id, method: 'PUT', body: snapshot }), 409);
+const bobView = await (await b('/api/workspace', { user: bob.id })).json();
+assert.deepEqual(bobView.catalog, updated);
+assert.equal(bobView.snapshot, null);
+const bobItem = { ...item, quantity: '2' };
+await expect(await b('/api/workspace/snapshot', { user: bob.id, method: 'PUT', body: { items: [bobItem] } }), 200);
 await expect(await a('/api/workspace/snapshot', { user: alice.id, method: 'PUT', body: snapshot }), 200);
 assignFixtureRole('ADMIN');
 assert.equal((await (await a('/api/auth/me')).json()).role, 'ADMIN');
@@ -126,6 +130,8 @@ await expect(await a('/api/workspace/snapshot', { user: alice.id, method: 'DELET
 assert.equal((await (await a('/api/workspace', { user: alice.id })).json()).snapshot, null);
 await expect(await a('/api/auth/logout', { method: 'POST' }), 204);
 await expect(await a('/api/workspace', { user: alice.id }), 401);
-assert.deepEqual((await (await b('/api/workspace', { user: bob.id })).json()).catalog, other);
+const bobFinal = await (await b('/api/workspace', { user: bob.id })).json();
+assert.deepEqual(bobFinal.catalog.brands, imported.catalog.brands);
+assert.deepEqual(bobFinal.snapshot.items, [bobItem]);
 
 console.log('静态资源和离线清单、注册登录退出、CSRF、用户隔离、品牌版本冲突、快照和备份回滚验证通过。');

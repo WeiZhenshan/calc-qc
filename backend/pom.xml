@@ -50,11 +50,6 @@
         <resources>
             <resource><directory>src/main/resources</directory></resource>
             <resource>
-                <directory>../docs/data</directory>
-                <targetPath>seed</targetPath>
-                <includes><include>default-brands.json</include></includes>
-            </resource>
-            <resource>
                 <directory>../frontend/dist</directory>
                 <targetPath>static</targetPath>
             </resource>

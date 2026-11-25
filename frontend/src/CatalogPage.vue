@@ -102,7 +102,7 @@ async function saveText() {
 }
 
 async function clearCatalog() {
-    if (!window.confirm('确定清空品牌库吗？品牌对应的标签分配和计算数据也会删除。')) return;
+    if (!window.confirm('确定清空共享品牌库吗？所有账号的品牌列表和对应计算明细都会清空。')) return;
     if (await props.saveCatalog({ ...props.catalog, brands: [] }, '品牌库已清空')) {
         resetEditor();
         editing.value = false;

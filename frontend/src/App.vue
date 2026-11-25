@@ -79,7 +79,7 @@ function saveSnapshot(snapshot) {
 
 async function importBackup(data) {
     const workspace = parseBackup(data, state.value.catalog.revision);
-    if (!window.confirm('导入将替换当前品牌库、标签和计算快照。确定继续吗？')) return;
+    if (!window.confirm('导入将替换所有账号共用的品牌库和标签，以及你自己的计算快照。确定继续吗？')) return;
     return commit('backup', workspace, '备份已导入');
 }
 
