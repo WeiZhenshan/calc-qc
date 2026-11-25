@@ -109,15 +109,8 @@ textarea { resize: vertical; display: block; line-height: 1.65; }
 .balance-detail dd { font-size: 21px; margin-top: 6px; font-weight: 650; overflow-wrap: anywhere; }
 .ledger { background: #fff; border: 1px solid var(--line); border-radius: 14px; margin-top: 22px; }
 .section-head { padding: 16px 22px 4px; }
-.ledger-head.compact {
-    position: sticky; z-index: 2; top: 0; padding-block: 6px; border-bottom: 1px solid var(--line);
-    background: #fcfdf9;
-}
-.running-profit { display: grid; gap: 2px; min-width: 0; }
-.running-profit span { font-size: 12px; color: var(--muted); }
-.running-profit strong { color: var(--forest); font-size: 18px; overflow-wrap: anywhere; }
 .section-title { gap: 9px; }
-.brand-row, .entry input { scroll-margin-top: 65px; scroll-margin-bottom: 80px; }
+.brand-row, .entry input { scroll-margin-bottom: 80px; }
 .section-title > span { color: var(--muted); font-size: 13px; }
 .tools { padding: 12px 22px 18px; }
 .tools .van-button { max-width: 40%; padding-inline: 14px; }
@@ -128,7 +121,14 @@ textarea { resize: vertical; display: block; line-height: 1.65; }
     align-items: center; gap: 12px; padding: 12px 20px;
 }
 .table-head, .catalog-labels { background: #f2f5ef; color: var(--muted); font-size: 13px; }
-.table-head { padding-block: 0; scroll-margin-top: 65px; }
+.table-head { padding-block: 0; }
+.pin-heading, .other-heading > strong {
+    display: flex; align-items: center; justify-content: space-between; padding: 8px 20px;
+    font-size: 13px; text-align: left;
+}
+.pin-heading { width: 100%; min-height: 44px; background: var(--mint); color: var(--forest); border: 0; }
+.pin-heading span { font-weight: 500; }
+.other-heading > strong { color: var(--muted); background: #f6f7f4; }
 .sort-column {
     min-height: 44px; justify-self: start; display: inline-flex; align-items: center; gap: 6px;
     padding: 0 6px 0 0; border: 0; background: transparent; color: inherit; font-size: inherit;
@@ -284,6 +284,7 @@ body:has(dialog[open]) { overflow: hidden; }
     .tools .van-button { max-width: none; }
     .table-head { display: flex; align-items: center; gap: 18px; padding: 0 14px; }
     .table-head > span { display: none; }
+    .pin-heading, .other-heading > strong { padding-inline: 14px; }
     .brand-row {
         grid-template-columns: minmax(0,1.1fr) minmax(0,1.1fr) minmax(0,.8fr);
         grid-template-areas: "identity identity identity" "wholesale market qty";

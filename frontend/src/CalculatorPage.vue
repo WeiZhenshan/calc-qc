@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { buildBrandIndex, matchBrand, matchMarketPriceRows, newBrandId, parseLine, validCatalogPrice } from './brands.js';
 import { calculateRow, money, rowValues, snapshotFromDraft, summarize } from './calculation.js';
 import { useListPagination } from './useListPagination.js';
@@ -25,20 +25,11 @@ const sortColumns = [
 const sortKey = ref('');
 const descending = ref(false);
 const editingPrice = ref(null);
+const editingRow = ref(null);
+const pinsExpanded = ref(true);
 const byName = new Intl.Collator('zh-CN-u-co-pinyin', { numeric: true });
 const adding = ref(false);
 const more = ref(false);
-const balancePanel = ref(null);
-const compactSummary = ref(false);
-let balanceObserver;
-
-onMounted(() => {
-    balanceObserver = new IntersectionObserver(([entry]) => {
-        compactSummary.value = entry.boundingClientRect.bottom < 0;
-    });
-    balanceObserver.observe(balancePanel.value);
-});
-onUnmounted(() => balanceObserver?.disconnect());
 const importing = ref(false);
 const importActions = ref(null);
 const importText = ref('');
@@ -49,12 +40,18 @@ const newName = ref('');
 const newWholesale = ref('');
 const newMarket = ref('');
 
-const visible = computed(() => props.catalog.brands.filter(brand =>
-    !props.draft[brand.id]?.hidden && (!filter.value || brand.tags.includes(filter.value))
-    && brand.name.toLowerCase().includes(query.value.trim().toLowerCase())));
-const hiddenCount = computed(() => props.catalog.brands.filter(brand => props.draft[brand.id]?.hidden).length);
+const catalogRows = computed(() => props.catalog.brands
+    .filter(brand => !props.draft[brand.id]?.hidden)
+    .map(brand => ({
+        brand,
+        values: rowValues(brand, props.draft[brand.id]),
+        result: calculateRow(brand, props.draft[brand.id]),
+    })));
+const included = computed(() => catalogRows.value.filter(row => row.result));
+const totalQuantity = computed(() => included.value.reduce((sum, row) => sum + Number.parseInt(row.values.quantity, 10), 0));
+const hiddenCount = computed(() => props.catalog.brands.length - catalogRows.value.length);
 const totals = computed(() => summarize(props.catalog.brands, props.draft));
-const printTotals = computed(() => summarize(visible.value, props.draft));
+const printTotals = computed(() => summarize(rows.value.map(row => row.brand), props.draft));
 const counts = computed(() => {
     const result = new Map();
     props.catalog.brands.forEach(brand => brand.tags.forEach(tag => result.set(tag, (result.get(tag) || 0) + 1)));
@@ -66,12 +63,8 @@ function priceForSort(row) {
     return Number.parseFloat(raw);
 }
 
-const rows = computed(() => {
-    const list = visible.value.map(brand => ({
-        brand,
-        values: rowValues(brand, props.draft[brand.id]),
-        result: calculateRow(brand, props.draft[brand.id]),
-    }));
+const sortedRows = computed(() => {
+    const list = [...catalogRows.value];
     const direction = descending.value ? -1 : 1;
     if (sortKey.value === 'name') {
         list.sort((a, b) => direction * byName.compare(a.brand.name, b.brand.name));
@@ -86,8 +79,37 @@ const rows = computed(() => {
     return list;
 });
 
+const rows = computed(() => {
+    const search = query.value.trim().toLowerCase();
+    return sortedRows.value.filter(({ brand }) =>
+        (!filter.value || brand.tags.includes(filter.value)) && brand.name.toLowerCase().includes(search));
+});
+
+function hasMarket(row) {
+    return String(row.values.market).trim() !== '';
+}
+
+function isPinned(row) {
+    return editingRow.value?.id === row.brand.id ? editingRow.value.pinned : hasMarket(row);
+}
+
+const pinnedRows = computed(() => sortedRows.value.filter(isPinned));
+const otherRows = computed(() => rows.value.filter(row => !isPinned(row)));
 const { page, pageCount, pageRows, listStart, readPage } =
-    useListPagination(rows, [query, filter, sortKey, descending]);
+    useListPagination(otherRows, [query, filter, sortKey, descending]);
+const groups = computed(() => [
+    { key: 'pinned', rows: pinsExpanded.value ? pinnedRows.value : [] },
+    { key: 'other', rows: pageRows.value },
+]);
+
+// Wait until focus leaves the row, so moving from price to quantity keeps the same inputs.
+function beginRowEdit(id, pinned) {
+    if (editingRow.value?.id !== id) editingRow.value = { id, pinned };
+}
+
+function endRowEdit(event) {
+    if (!event.currentTarget.contains(event.relatedTarget)) editingRow.value = null;
+}
 
 function toggleSort(key) {
     descending.value = sortKey.value === key && !descending.value;
@@ -261,11 +283,11 @@ function runAction(action) {
             </div>
         </header>
 
-        <section ref="balancePanel" class="balance" aria-label="全部品牌计算汇总">
+        <section class="balance" aria-label="全部品牌计算汇总">
             <div class="balance-main">
                 <div class="balance-label"><van-icon name="balance-o" aria-hidden="true" />利润差价</div>
                 <strong class="balance-amount">{{ money(totals.profit) }}</strong>
-                <span class="balance-count">{{ filter || query.trim() ? '全部品牌合计 · ' : '' }}共 {{ totals.count }} 个品牌计入合计</span>
+                <span class="balance-count">本次计算 · {{ totals.count }} 款 · {{ totalQuantity }} 条</span>
             </div>
             <dl class="balance-detail">
                 <div><dt>总成本</dt><dd>{{ money(totals.cost) }}</dd></div>
@@ -274,15 +296,9 @@ function runAction(action) {
         </section>
 
         <section class="ledger" :class="{ 'read-only-catalog': !canEditCatalog }" aria-label="价格明细">
-            <header class="section-head ledger-head" :class="{ compact: compactSummary }">
-                <template v-if="compactSummary">
-                    <div class="running-profit"><span>全部利润差价</span><strong>{{ money(totals.profit) }}</strong></div>
-                    <van-button type="primary" :disabled="busy" @click="save">保存计算</van-button>
-                </template>
-                <template v-else>
-                <div class="section-title"><h2>价格明细</h2><span>{{ rows.length }} 项</span></div>
+            <header class="section-head ledger-head">
+                <div class="section-title"><h2>查找品规</h2><span>{{ rows.length }} 项</span></div>
                 <van-button v-if="canEditCatalog" icon="plus" aria-label="添加品牌" class="quiet-action" :disabled="busy" @click="adding = true">添加品牌</van-button>
-                </template>
             </header>
             <div class="tools">
                 <label class="sr-only" for="calc-search">搜索计算品牌</label>
@@ -293,7 +309,7 @@ function runAction(action) {
             <button v-if="hiddenCount" type="button" class="text-button restore" :disabled="busy" @click="restoreAll">
                 恢复已移除的品牌（{{ hiddenCount }}）
             </button>
-            <div ref="listStart" class="table-head row-grid" role="group" aria-label="价格明细排序" tabindex="-1">
+            <div class="table-head row-grid" role="group" aria-label="价格明细排序" tabindex="-1">
                 <button v-for="column in sortColumns" :key="column.key" type="button" class="sort-column"
                     :aria-pressed="sortKey === column.key"
                     :aria-label="column.label + (sortKey === column.key ? (descending ? '，当前降序' : '，当前升序') : '排序')"
@@ -302,32 +318,43 @@ function runAction(action) {
                 </button>
                 <span>市场价</span><span>数量</span><span>小计差价</span>
             </div>
-            <div v-for="{ brand, result, values } in pageRows" :key="brand.id" class="brand-row row-grid">
-                <div class="row-identity">
-                    <div class="brand-info">
-                        <strong>{{ brand.name }}</strong>
-                        <div v-if="brand.tags.length" class="row-tags">
-                            <button v-for="tag in brand.tags" :key="tag" type="button" class="tag-link"
-                                :aria-pressed="filter === tag" @click="chooseTag(filter === tag ? '' : tag)">{{ tag }}</button>
-                        </div>
-                    </div>
-                    <output class="difference" :class="{ loss: result?.profit < 0, pending: !result }"
-                        :aria-label="brand.name + ' 小计差价'">{{ result ? (result.profit > 0 ? '+' : '') + money(result.profit) : '待计算' }}</output>
+            <template v-for="group in groups" :key="group.key">
+                <button v-if="group.key === 'pinned' && pinnedRows.length" type="button" class="pin-heading"
+                    :aria-expanded="pinsExpanded" @click="pinsExpanded = !pinsExpanded">
+                    <strong>已填市场价 · {{ pinnedRows.length }} 款</strong>
+                    <span>{{ pinsExpanded ? '收起' : '展开' }} <van-icon :name="pinsExpanded ? 'arrow-up' : 'arrow-down'" /></span>
+                </button>
+                <div v-if="group.key === 'other'" :ref="el => { listStart = el }" tabindex="-1" class="other-heading">
+                    <strong v-if="pinnedRows.length && otherRows.length">待填市场价 · {{ otherRows.length }} 款</strong>
                 </div>
-                <label class="entry wholesale"><span>批发价</span>
-                    <input :aria-label="brand.name + ' 批发价'" type="number" inputmode="decimal" step="any" min="0"
-                        :disabled="busy" :value="values.wholesale" @focus="editingPrice = { id: brand.id, value: values.wholesale }"
-                        @blur="editingPrice = null" @input="update(brand.id, 'wholesale', $event.target.value)">
-                </label>
-                <label class="entry market"><span>市场价</span>
-                    <input :aria-label="brand.name + ' 市场价'" type="number" inputmode="decimal" placeholder="待填写" step="any" min="0"
-                        :disabled="busy" :value="values.market" @input="update(brand.id, 'market', $event.target.value)">
-                </label>
-                <label class="entry quantity"><span>数量（条）</span>
-                    <input :aria-label="brand.name + ' 数量'" type="number" inputmode="numeric" min="1" max="9999" step="1"
-                        :disabled="busy" :value="values.quantity" @input="update(brand.id, 'quantity', $event.target.value)">
-                </label>
-            </div>
+                <div v-for="{ brand, result, values } in group.rows" :key="brand.id" class="brand-row row-grid"
+                    @focusin="beginRowEdit(brand.id, group.key === 'pinned')" @focusout="endRowEdit">
+                    <div class="row-identity">
+                        <div class="brand-info">
+                            <strong>{{ brand.name }}</strong>
+                            <div v-if="brand.tags.length" class="row-tags">
+                                <button v-for="tag in brand.tags" :key="tag" type="button" class="tag-link"
+                                    :aria-pressed="filter === tag" @click="chooseTag(filter === tag ? '' : tag)">{{ tag }}</button>
+                            </div>
+                        </div>
+                        <output class="difference" :class="{ loss: result?.profit < 0, pending: !result }"
+                            :aria-label="brand.name + ' 小计差价'">{{ result ? (result.profit > 0 ? '+' : '') + money(result.profit) : '待计算' }}</output>
+                    </div>
+                    <label class="entry wholesale"><span>批发价</span>
+                        <input :aria-label="brand.name + ' 批发价'" type="number" inputmode="decimal" step="any" min="0"
+                            :disabled="busy" :value="values.wholesale" @focus="editingPrice = { id: brand.id, value: values.wholesale }"
+                            @blur="editingPrice = null" @input="update(brand.id, 'wholesale', $event.target.value)">
+                    </label>
+                    <label class="entry market"><span>市场价</span>
+                        <input :aria-label="brand.name + ' 市场价'" type="number" inputmode="decimal" placeholder="待填写" step="any" min="0"
+                            :disabled="busy" :value="values.market" @input="update(brand.id, 'market', $event.target.value)">
+                    </label>
+                    <label class="entry quantity"><span>数量（条）</span>
+                        <input :aria-label="brand.name + ' 数量'" type="number" inputmode="numeric" min="1" max="9999" step="1"
+                            :disabled="busy" :value="values.quantity" @input="update(brand.id, 'quantity', $event.target.value)">
+                    </label>
+                </div>
+            </template>
             <div v-if="!rows.length" class="empty-state">
                 <van-icon name="search" /><p>{{ query || filter ? '没有匹配的品牌' : hiddenCount ? '当前品牌均已移除' : '品牌库为空' }}</p>
                 <button v-if="query || filter" type="button" class="text-button" @click="query = ''; chooseTag('')">清除筛选条件</button>
