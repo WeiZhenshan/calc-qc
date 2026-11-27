@@ -27,6 +27,7 @@ const descending = ref(false);
 const editingPrice = ref(null);
 const editingRow = ref(null);
 const pinsExpanded = ref(true);
+const tableHead = ref(null);
 const byName = new Intl.Collator('zh-CN-u-co-pinyin', { numeric: true });
 const adding = ref(false);
 const more = ref(false);
@@ -125,6 +126,18 @@ watch(() => props.active, active => {
 
 function update(id, field, value) {
     props.draft[id] = { ...props.draft[id], [field]: value };
+}
+
+function clearMarketPrices() {
+    const filledRows = catalogRows.value.filter(hasMarket);
+    if (!filledRows.length) return;
+
+    tableHead.value?.focus({ preventScroll: true });
+    for (const { brand } of filledRows) {
+        update(brand.id, 'market', '');
+    }
+    pinsExpanded.value = true;
+    props.notify(`已清除 ${filledRows.length} 款市场价，点击「保存计算」可保存`);
 }
 
 function restoreAll() {
@@ -309,7 +322,7 @@ function runAction(action) {
             <button v-if="hiddenCount" type="button" class="text-button restore" :disabled="busy" @click="restoreAll">
                 恢复已移除的品牌（{{ hiddenCount }}）
             </button>
-            <div class="table-head row-grid" role="group" aria-label="价格明细排序" tabindex="-1">
+            <div ref="tableHead" class="table-head row-grid" role="group" aria-label="价格明细排序" tabindex="-1">
                 <button v-for="column in sortColumns" :key="column.key" type="button" class="sort-column"
                     :aria-pressed="sortKey === column.key"
                     :aria-label="column.label + (sortKey === column.key ? (descending ? '，当前降序' : '，当前升序') : '排序')"
@@ -319,11 +332,14 @@ function runAction(action) {
                 <span>市场价</span><span>数量</span><span>小计差价</span>
             </div>
             <template v-for="group in groups" :key="group.key">
-                <button v-if="group.key === 'pinned' && pinnedRows.length" type="button" class="pin-heading"
-                    :aria-expanded="pinsExpanded" @click="pinsExpanded = !pinsExpanded">
-                    <strong>已填市场价 · {{ pinnedRows.length }} 款</strong>
-                    <span>{{ pinsExpanded ? '收起' : '展开' }} <van-icon :name="pinsExpanded ? 'arrow-up' : 'arrow-down'" /></span>
-                </button>
+                <div v-if="group.key === 'pinned' && pinnedRows.length" class="pin-heading">
+                    <button type="button" class="pin-toggle" :aria-expanded="pinsExpanded" @click="pinsExpanded = !pinsExpanded">
+                        <strong>已填市场价 · {{ pinnedRows.length }} 款</strong>
+                        <span>{{ pinsExpanded ? '收起' : '展开' }} <van-icon :name="pinsExpanded ? 'arrow-up' : 'arrow-down'" aria-hidden="true" /></span>
+                    </button>
+                    <button type="button" class="text-button danger pin-clear" :disabled="busy"
+                        aria-label="一键清除已填市场价" @click="clearMarketPrices">一键清除</button>
+                </div>
                 <div v-if="group.key === 'other'" :ref="el => { listStart = el }" tabindex="-1" class="other-heading">
                     <strong v-if="pinnedRows.length && otherRows.length">待填市场价 · {{ otherRows.length }} 款</strong>
                 </div>

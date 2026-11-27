@@ -123,12 +123,18 @@ textarea { resize: vertical; display: block; line-height: 1.65; }
 .table-head, .catalog-labels { background: #f2f5ef; color: var(--muted); font-size: 13px; }
 .table-head { padding-block: 0; }
 .pin-heading, .other-heading > strong {
-    display: flex; align-items: center; justify-content: space-between; padding: 8px 20px;
+    display: flex; align-items: center; padding-inline: 20px;
     font-size: 13px; text-align: left;
 }
-.pin-heading { width: 100%; min-height: 44px; background: var(--mint); color: var(--forest); border: 0; }
-.pin-heading span { font-weight: 500; }
-.other-heading > strong { color: var(--muted); background: #f6f7f4; }
+.pin-heading { gap: 12px; background: var(--mint); color: var(--forest); }
+.pin-toggle {
+    flex: 1; min-width: 0; min-height: 44px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 0; border: 0; background: transparent; color: inherit; text-align: left;
+}
+.pin-toggle span { font-weight: 500; white-space: nowrap; }
+.pin-clear { flex: none; font-size: inherit; white-space: nowrap; }
+.other-heading > strong { padding-block: 8px; color: var(--muted); background: #f6f7f4; }
 .sort-column {
     min-height: 44px; justify-self: start; display: inline-flex; align-items: center; gap: 6px;
     padding: 0 6px 0 0; border: 0; background: transparent; color: inherit; font-size: inherit;
